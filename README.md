@@ -49,6 +49,28 @@ docker compose down -v --remove-orphans
 | review → accepted/escalated | reviewer/admin | 追加最终决定版本；operator 会被拒绝 |
 | review 后修改字段 | 无 | 返回业务规则错误，历史与证据不可覆盖 |
 
+## 复核闭环（review gate）
+
+合规决定**进入复核（draft → review）与最终判定（review → accepted/escalated）**时，后端都会按决定的关联装置（`relatedCode` 即装置编码）**重新读取当前数据**，不使用创建时缓存：
+
+1. 关联装置必须存在，且决定作业区与装置作业区一致；
+2. 读取该装置当前生效（`active`）的许可规则（`draft/superseded/retired` 均不算生效）；
+3. 读取该装置最新一条已核验（`verified`）样本（`collected/testing/invalid` 不可采信），规则与样本计量单位必须一致。
+
+核验结论随决定接口返回为只读 `reviewGate`（不入库、不产生版本），页面在决定表格和“复核闭环核验”面板实时展示规则、阈值、样本、读数与原因：
+
+| 结论 | 条件 | 允许操作 |
+|---|---|---|
+| `ready` | 装置一致、证据齐全且读数 ≤ 阈值 | 最终判定只允许复核人 **接受（accepted）** |
+| `exceeded` | 最新已核验读数高于生效规则阈值 | 最终判定只能 **升级（escalated）** |
+| `blocked` | 未关联装置、装置不存在、作业区/单位不一致、无生效规则或无已核验样本 | 进入复核也被拒绝，**保留原状态**并在页面显示具体原因 |
+
+说明：`exceeded` 的 draft 允许进入 review（把超标风险带入待判定），之后闭环只允许升级；若在进入复核阶段就连证据都不齐全（`blocked`），则保留 draft 原状态。
+
+- 核验未通过返回 HTTP 422 `review_gate`，响应体 `data.reviewGate` 携带最新结论与 `reasons`，**不写新版本、不写审计、不覆盖既有证据**；前端据此展示原因并静默重读最新状态。
+- 并发提交与重复审核由乐观锁（`WHERE id=? AND version=?`）拦截，过期 `expectedVersion` 一律返回 HTTP 409 `version_conflict`，同一版本最多生成一次新版本。
+- 状态推进、不可变版本（`DecisionRevision`）与审计日志在**单个数据库事务**内提交，任一步失败整体回滚。
+
 ## 技术栈
 
 | 层次 | 技术 |

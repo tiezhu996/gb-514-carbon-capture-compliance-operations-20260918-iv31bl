@@ -136,17 +136,17 @@ func seedCaptureUnit(ctx context.Context, db *gorm.DB) error {
 		{BaseModel: model.BaseModel{Code: "CU-001", Name: "捕集装置示例一", Status: "standby", Version: 1,
 			Description: "用于启动验证和主要流程演示的捕集装置记录"}, Facility: "碳捕集装置合规运行区域1", Owner: "运行一组",
 			Category: "常规", RiskLevel: "low", MetricValue: 12.5, MetricUnit: "unit",
-			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-01"},
+			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-001"},
 
 		{BaseModel: model.BaseModel{Code: "CU-002", Name: "捕集装置示例二", Status: "running", Version: 1,
 			Description: "用于启动验证和主要流程演示的捕集装置记录"}, Facility: "碳捕集装置合规运行区域2", Owner: "质量复核组",
 			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
-			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-02"},
+			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-002"},
 
 		{BaseModel: model.BaseModel{Code: "CU-003", Name: "捕集装置示例三", Status: "limited", Version: 1,
 			Description: "用于启动验证和主要流程演示的捕集装置记录"}, Facility: "碳捕集装置合规运行区域3", Owner: "安全主管组",
 			Category: "复核", RiskLevel: "high", MetricValue: 37.5, MetricUnit: "score",
-			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-03"},
+			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-003"},
 	}
 	return db.WithContext(ctx).Create(&items).Error
 }
@@ -159,20 +159,20 @@ func seedPermitRule(ctx context.Context, db *gorm.DB) error {
 	now := time.Now().UTC()
 	items := []model.PermitRule{
 
-		{BaseModel: model.BaseModel{Code: "PR-001", Name: "许可规则示例一", Status: "draft", Version: 1,
+		{BaseModel: model.BaseModel{Code: "PR-001", Name: "许可规则示例一", Status: "active", Version: 1,
 			Description: "用于启动验证和主要流程演示的许可规则记录"}, Facility: "碳捕集装置合规运行区域1", Owner: "运行一组",
-			Category: "常规", RiskLevel: "low", MetricValue: 12.5, MetricUnit: "unit",
-			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-01"},
+			Category: "常规", RiskLevel: "low", MetricValue: 50, MetricUnit: "unit",
+			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-001"},
 
 		{BaseModel: model.BaseModel{Code: "PR-002", Name: "许可规则示例二", Status: "active", Version: 1,
 			Description: "用于启动验证和主要流程演示的许可规则记录"}, Facility: "碳捕集装置合规运行区域2", Owner: "质量复核组",
-			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
-			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-02"},
+			Category: "重点", RiskLevel: "medium", MetricValue: 30, MetricUnit: "%",
+			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-002"},
 
-		{BaseModel: model.BaseModel{Code: "PR-003", Name: "许可规则示例三", Status: "superseded", Version: 1,
+		{BaseModel: model.BaseModel{Code: "PR-003", Name: "许可规则示例三", Status: "active", Version: 1,
 			Description: "用于启动验证和主要流程演示的许可规则记录"}, Facility: "碳捕集装置合规运行区域3", Owner: "安全主管组",
-			Category: "复核", RiskLevel: "high", MetricValue: 37.5, MetricUnit: "score",
-			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-03"},
+			Category: "复核", RiskLevel: "high", MetricValue: 40, MetricUnit: "score",
+			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-003"},
 	}
 	return db.WithContext(ctx).Create(&items).Error
 }
@@ -185,20 +185,20 @@ func seedEmissionSample(ctx context.Context, db *gorm.DB) error {
 	now := time.Now().UTC()
 	items := []model.EmissionSample{
 
-		{BaseModel: model.BaseModel{Code: "ES-001", Name: "排放样本示例一", Status: "collected", Version: 1,
+		{BaseModel: model.BaseModel{Code: "ES-001", Name: "排放样本示例一", Status: "verified", Version: 1,
 			Description: "用于启动验证和主要流程演示的排放样本记录"}, Facility: "碳捕集装置合规运行区域1", Owner: "运行一组",
-			Category: "常规", RiskLevel: "low", MetricValue: 12.5, MetricUnit: "unit",
-			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-01"},
+			Category: "常规", RiskLevel: "low", MetricValue: 32, MetricUnit: "unit",
+			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-001"},
 
-		{BaseModel: model.BaseModel{Code: "ES-002", Name: "排放样本示例二", Status: "testing", Version: 1,
+		{BaseModel: model.BaseModel{Code: "ES-002", Name: "排放样本示例二", Status: "verified", Version: 1,
 			Description: "用于启动验证和主要流程演示的排放样本记录"}, Facility: "碳捕集装置合规运行区域2", Owner: "质量复核组",
-			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
-			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-02"},
+			Category: "重点", RiskLevel: "medium", MetricValue: 41, MetricUnit: "%",
+			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-002"},
 
 		{BaseModel: model.BaseModel{Code: "ES-003", Name: "排放样本示例三", Status: "verified", Version: 1,
 			Description: "用于启动验证和主要流程演示的排放样本记录"}, Facility: "碳捕集装置合规运行区域3", Owner: "安全主管组",
-			Category: "复核", RiskLevel: "high", MetricValue: 37.5, MetricUnit: "score",
-			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-03"},
+			Category: "复核", RiskLevel: "high", MetricValue: 28, MetricUnit: "score",
+			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-003"},
 	}
 	return db.WithContext(ctx).Create(&items).Error
 }
@@ -213,18 +213,18 @@ func seedComplianceDecision(ctx context.Context, db *gorm.DB) error {
 
 		{BaseModel: model.BaseModel{Code: "CD-001", Name: "合规决定示例一", Status: "draft", Version: 1,
 			Description: "用于启动验证和主要流程演示的合规决定记录"}, Facility: "碳捕集装置合规运行区域1", Owner: "运行一组",
-			Category: "常规", RiskLevel: "low", MetricValue: 12.5, MetricUnit: "unit",
-			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-01"},
+			Category: "常规", RiskLevel: "low", MetricValue: 32, MetricUnit: "unit",
+			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-001"},
 
 		{BaseModel: model.BaseModel{Code: "CD-002", Name: "合规决定示例二", Status: "review", Version: 1,
 			Description: "用于启动验证和主要流程演示的合规决定记录"}, Facility: "碳捕集装置合规运行区域2", Owner: "质量复核组",
-			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
-			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-02"},
+			Category: "重点", RiskLevel: "high", MetricValue: 41, MetricUnit: "%",
+			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-002"},
 
-		{BaseModel: model.BaseModel{Code: "CD-003", Name: "合规决定示例三", Status: "accepted", Version: 1,
+		{BaseModel: model.BaseModel{Code: "CD-003", Name: "合规决定示例三", Status: "review", Version: 1,
 			Description: "用于启动验证和主要流程演示的合规决定记录"}, Facility: "碳捕集装置合规运行区域3", Owner: "安全主管组",
-			Category: "复核", RiskLevel: "high", MetricValue: 37.5, MetricUnit: "score",
-			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-03"},
+			Category: "复核", RiskLevel: "medium", MetricValue: 28, MetricUnit: "score",
+			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "CU-003"},
 	}
 	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Omit("Revisions").Create(&items).Error; err != nil {

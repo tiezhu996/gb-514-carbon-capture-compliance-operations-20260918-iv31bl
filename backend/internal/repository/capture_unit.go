@@ -16,14 +16,16 @@ type CaptureUnitRepository interface {
 	Update(context.Context, uint, uint, *model.CaptureUnit) error
 	Delete(context.Context, uint) error
 	CountByStatus(context.Context) (map[string]int64, error)
+	FindByCode(context.Context, string) (model.CaptureUnit, error)
 }
 
 type captureUnitRepository struct {
 	store *Store[model.CaptureUnit]
+	db    *gorm.DB
 }
 
 func NewCaptureUnitRepository(db *gorm.DB) CaptureUnitRepository {
-	return &captureUnitRepository{store: NewStore[model.CaptureUnit](db)}
+	return &captureUnitRepository{store: NewStore[model.CaptureUnit](db), db: db}
 }
 
 func (r *captureUnitRepository) List(ctx context.Context, q dto.PageQuery) (Page[model.CaptureUnit], error) {
@@ -43,4 +45,9 @@ func (r *captureUnitRepository) Delete(ctx context.Context, id uint) error {
 }
 func (r *captureUnitRepository) CountByStatus(ctx context.Context) (map[string]int64, error) {
 	return r.store.CountByStatus(ctx)
+}
+func (r *captureUnitRepository) FindByCode(ctx context.Context, code string) (model.CaptureUnit, error) {
+	var item model.CaptureUnit
+	err := r.db.WithContext(ctx).Where("code = ?", code).First(&item).Error
+	return item, err
 }

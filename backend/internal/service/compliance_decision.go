@@ -25,18 +25,33 @@ type ComplianceDecisionService interface {
 type complianceDecisionService struct {
 	repository repository.ComplianceDecisionRepository
 	security   SecurityService
+	gate       DecisionReviewGate
 }
 
-func NewComplianceDecisionService(repo repository.ComplianceDecisionRepository, security SecurityService) ComplianceDecisionService {
-	return &complianceDecisionService{repository: repo, security: security}
+func NewComplianceDecisionService(repo repository.ComplianceDecisionRepository, security SecurityService, gate DecisionReviewGate) ComplianceDecisionService {
+	return &complianceDecisionService{repository: repo, security: security, gate: gate}
 }
 
 func (s *complianceDecisionService) List(ctx context.Context, query dto.PageQuery) (repository.Page[model.ComplianceDecision], error) {
-	return s.repository.List(ctx, query)
+	page, err := s.repository.List(ctx, query)
+	if err != nil {
+		return page, err
+	}
+	for index := range page.Items {
+		gate := s.gate.Evaluate(ctx, page.Items[index])
+		page.Items[index].ReviewGate = &gate
+	}
+	return page, nil
 }
 
 func (s *complianceDecisionService) Get(ctx context.Context, id uint) (model.ComplianceDecision, error) {
-	return s.repository.Get(ctx, id)
+	item, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return item, err
+	}
+	gate := s.gate.Evaluate(ctx, item)
+	item.ReviewGate = &gate
+	return item, nil
 }
 
 func (s *complianceDecisionService) Create(ctx context.Context, input dto.CreateComplianceDecision, actor, requestID string) (model.ComplianceDecision, error) {
@@ -59,7 +74,7 @@ func (s *complianceDecisionService) Create(ctx context.Context, input dto.Create
 		return model.ComplianceDecision{}, fmt.Errorf("create 合规决定: %w", err)
 	}
 	_ = s.security.Audit(ctx, actor, requestID, "create", "ComplianceDecision", item.ID, "", item.Status, "created 合规决定")
-	return s.repository.Get(ctx, item.ID)
+	return s.Get(ctx, item.ID)
 }
 
 func (s *complianceDecisionService) Update(ctx context.Context, id uint, input dto.UpdateComplianceDecision, actor, requestID string) (model.ComplianceDecision, error) {
@@ -91,7 +106,7 @@ func (s *complianceDecisionService) Update(ctx context.Context, id uint, input d
 		return model.ComplianceDecision{}, fmt.Errorf("update 合规决定: %w", err)
 	}
 	_ = s.security.Audit(ctx, actor, requestID, "update", "ComplianceDecision", id, current.Status, current.Status, "updated business fields")
-	return s.repository.Get(ctx, id)
+	return s.Get(ctx, id)
 }
 
 func (s *complianceDecisionService) Transition(ctx context.Context, id uint, input dto.TransitionRequest, actor, role, requestID string) (model.ComplianceDecision, error) {
@@ -100,25 +115,76 @@ func (s *complianceDecisionService) Transition(ctx context.Context, id uint, inp
 		return model.ComplianceDecision{}, err
 	}
 	target := strings.TrimSpace(input.Status)
+	// 乐观锁优先：重复审核或并发提交只要携带过期版本，就直接判定为版本冲突，让调用方
+	// 刷新后重试；保证同一版本绝不会生成两次新版本，也不落到状态机分支。
+	if input.ExpectedVersion != current.Version {
+		return model.ComplianceDecision{}, fmt.Errorf("%w: expected version %d, current %d",
+			repository.ErrVersionConflict, input.ExpectedVersion, current.Version)
+	}
 	if !constants.CanTransition(constants.ComplianceDecisionTransitions, current.Status, target) {
 		return model.ComplianceDecision{}, fmt.Errorf("%w: %s -> %s", ErrInvalidTransition, current.Status, target)
 	}
-	if (target == string(constants.DecisionStateAccepted) || target == string(constants.DecisionStateEscalated)) &&
-		role != model.RoleReviewer && role != model.RoleAdmin {
-		return model.ComplianceDecision{}, ErrReviewerRequired
+
+	// 复核闭环：进入复核或做最终判定时，都按关联装置重新读取当前生效许可规则与
+	// 最新已核验样本。退回草稿（review -> draft）不属于判定动作，不施加闭环约束。
+	if target != string(constants.DecisionStateDraft) {
+		gate := s.gate.Evaluate(ctx, current)
+		finalDecision := target == string(constants.DecisionStateAccepted) || target == string(constants.DecisionStateEscalated)
+
+		if finalDecision && role != model.RoleReviewer && role != model.RoleAdmin {
+			return model.ComplianceDecision{}, ErrReviewerRequired
+		}
+
+		switch gate.Outcome {
+		case model.ReviewGateBlocked:
+			// 样本缺失或装置不一致：进入复核与最终判定都保留原状态并返回原因。
+			return model.ComplianceDecision{}, NewReviewGateError(gate)
+		case model.ReviewGateReady:
+			// 阈值内只允许复核人接受；进入复核阶段（draft -> review）放行。
+			if finalDecision && target != string(constants.DecisionStateAccepted) {
+				return model.ComplianceDecision{}, NewReviewGateError(gate)
+			}
+		case model.ReviewGateExceeded:
+			// 读数超阈值只能升级。进入复核阶段时放行，使超标决定带着风险进入待判定，
+			// 闭环最终只能由复核人升级处理。
+			if finalDecision && target != string(constants.DecisionStateEscalated) {
+				return model.ComplianceDecision{}, NewReviewGateError(gate)
+			}
+		}
 	}
+
 	before := current.Status
 	current.Status = target
 	current.Version = input.ExpectedVersion + 1
 	current.UpdatedAt = time.Now().UTC()
 	revision := newDecisionRevision(current.Version, target, current.Evidence, input.Reason, actor, requestID)
-	if err := s.repository.UpdateWithRevision(ctx, id, input.ExpectedVersion, &current, revision); err != nil {
+	auditLog := &model.AuditLog{
+		Actor: auditActor(actor), RequestID: auditRequestID(requestID), Action: "transition",
+		EntityType: "ComplianceDecision", EntityID: id, BeforeState: before, AfterState: target,
+		Detail: strings.TrimSpace(input.Reason), CreatedAt: time.Now().UTC(),
+	}
+	// 乐观锁 + 单事务版本/审计：并发提交和重复审核只能生成一次版本，失败不覆盖
+	// 既有证据或审计。
+	if err := s.repository.TransitionWithRevisionAndAudit(ctx, id, input.ExpectedVersion, &current, revision, auditLog); err != nil {
 		return model.ComplianceDecision{}, fmt.Errorf("transition 合规决定: %w", err)
 	}
-	if err := s.security.Audit(ctx, actor, requestID, "transition", "ComplianceDecision", id, before, target, input.Reason); err != nil {
-		return model.ComplianceDecision{}, fmt.Errorf("persist transition audit: %w", err)
+	return s.Get(ctx, id)
+}
+
+func auditActor(actor string) string {
+	actor = strings.TrimSpace(actor)
+	if actor == "" {
+		return "system"
 	}
-	return s.repository.Get(ctx, id)
+	return actor
+}
+
+func auditRequestID(requestID string) string {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return "untracked"
+	}
+	return requestID
 }
 
 func (s *complianceDecisionService) Delete(ctx context.Context, id uint, actor, requestID string) error {

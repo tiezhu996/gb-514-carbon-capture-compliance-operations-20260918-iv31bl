@@ -16,14 +16,16 @@ type EmissionSampleRepository interface {
 	Update(context.Context, uint, uint, *model.EmissionSample) error
 	Delete(context.Context, uint) error
 	CountByStatus(context.Context) (map[string]int64, error)
+	FindLatestVerifiedByRelatedCode(context.Context, string) (model.EmissionSample, error)
 }
 
 type emissionSampleRepository struct {
 	store *Store[model.EmissionSample]
+	db    *gorm.DB
 }
 
 func NewEmissionSampleRepository(db *gorm.DB) EmissionSampleRepository {
-	return &emissionSampleRepository{store: NewStore[model.EmissionSample](db)}
+	return &emissionSampleRepository{store: NewStore[model.EmissionSample](db), db: db}
 }
 
 func (r *emissionSampleRepository) List(ctx context.Context, q dto.PageQuery) (Page[model.EmissionSample], error) {
@@ -43,4 +45,14 @@ func (r *emissionSampleRepository) Delete(ctx context.Context, id uint) error {
 }
 func (r *emissionSampleRepository) CountByStatus(ctx context.Context) (map[string]int64, error) {
 	return r.store.CountByStatus(ctx)
+}
+
+// FindLatestVerifiedByRelatedCode 返回关联装置最新一条已核验（verified）样本；
+// collected/testing/invalid 都不能作为复核闭环的证据。
+func (r *emissionSampleRepository) FindLatestVerifiedByRelatedCode(ctx context.Context, relatedCode string) (model.EmissionSample, error) {
+	var item model.EmissionSample
+	err := r.db.WithContext(ctx).
+		Where("related_code = ? AND status = ?", relatedCode, "verified").
+		Order("effective_at DESC, updated_at DESC, id DESC").First(&item).Error
+	return item, err
 }

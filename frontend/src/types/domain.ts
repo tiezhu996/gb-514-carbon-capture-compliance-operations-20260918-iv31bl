@@ -18,6 +18,25 @@ export interface DomainRecord {
   createdAt: string;
   updatedAt: string;
   revisions?: DecisionRevision[];
+  reviewGate?: ReviewGate | null;
+}
+
+export type ReviewGateOutcome = 'ready' | 'blocked' | 'exceeded';
+
+export interface ReviewGate {
+  outcome: ReviewGateOutcome;
+  unitCode?: string;
+  ruleCode?: string;
+  ruleVersion?: number;
+  ruleThreshold?: number;
+  metricUnit?: string;
+  sampleCode?: string;
+  sampleReading?: number;
+  sampleStatus?: string;
+  withinThreshold: boolean;
+  allowedAction?: string;
+  reasons: string[];
+  checkedAt: string;
 }
 
 export interface DecisionRevision {
