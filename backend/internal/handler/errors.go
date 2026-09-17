@@ -12,13 +12,19 @@ import (
 )
 
 func handleError(c *gin.Context, err error) {
+	var gateErr *service.ReviewGateError
 	switch {
+	case errors.As(err, &gateErr):
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": "review_gate", "message": gateErr.Error(), "data": gin.H{"reviewCheck": gateErr.Check},
+		})
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		util.Fail(c, http.StatusNotFound, "not_found", "record was not found")
 	case errors.Is(err, repository.ErrVersionConflict):
 		util.Fail(c, http.StatusConflict, "version_conflict", "record changed; refresh and retry")
 	case errors.Is(err, service.ErrInvalidTransition), errors.Is(err, service.ErrInvalidInput),
-		errors.Is(err, service.ErrReviewerRequired), errors.Is(err, service.ErrDecisionLocked):
+		errors.Is(err, service.ErrReviewerRequired), errors.Is(err, service.ErrDecisionLocked),
+		errors.Is(err, service.ErrReviewCheckFailed):
 		util.Fail(c, http.StatusUnprocessableEntity, "business_rule", err.Error())
 	default:
 		_ = c.Error(err)

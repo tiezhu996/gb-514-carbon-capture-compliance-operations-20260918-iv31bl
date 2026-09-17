@@ -33,6 +33,7 @@ docker compose down -v --remove-orphans
 
 - JWT 登录和 viewer/operator/reviewer/admin 四级 RBAC；写操作至少需要 operator，删除仅 admin，审计至少 reviewer。
 - 合规决定每次创建、草稿修改和状态迁移都会事务追加不可变版本，保存状态、证据、操作者和 request ID；进入 review 后业务字段锁定，accepted/escalated 仅 reviewer 或 admin 可执行。
+- **合规决定复核闭环**：进入复核（draft→review）和最终判定（review→accepted/escalated）时，后端按决定的「关联装置编码」重新读取当前生效（active）许可规则与最新已核验（verified）样本，而不是信任草稿期快照。样本缺失、装置/作业区/单位不一致或读数超阈值时保留原状态，并在复核决定页展示具体原因；读数在阈值内最终判定只允许复核人接受（accepted），超阈值只能升级（escalated）。状态更新、不可变版本和审计在同一事务内提交，乐观锁保证并发提交与重复审核只生成一个版本，门禁失败或冲突回滚，不覆盖既有证据或审计。
 - 所有状态变化使用乐观锁并写入不可覆盖的审计日志。
 - 请求 ID、结构化日志、全局错误映射和 Redis 分布式限流。
 - 提供脱敏运行配置、当前会话、审计汇总和单实体审计历史接口。
@@ -45,9 +46,13 @@ docker compose down -v --remove-orphans
 |---|---|---|
 | 创建 draft | operator/reviewer/admin | 写入 v1，保留证据、actor、request ID |
 | 修改 draft | operator/reviewer/admin | 乐观锁更新并追加下一版本 |
-| draft → review | operator/reviewer/admin | 追加复核版本，禁止跳过 review |
-| review → accepted/escalated | reviewer/admin | 追加最终决定版本；operator 会被拒绝 |
+| draft → review | operator/reviewer/admin | 追加复核版本，禁止跳过 review；门禁未通过则保留 draft |
+| review → accepted/escalated | reviewer/admin | 追加最终决定版本；operator 会被拒绝；阈值内只能 accepted，超阈值只能 escalated |
 | review 后修改字段 | 无 | 返回业务规则错误，历史与证据不可覆盖 |
+| 并发/重复提交 | 同状态机权限 | 乐观锁只放行一次，其余返回 409，不产生额外版本或审计 |
+| 门禁失败（样本缺失/装置不一致/超阈值走反向） | 无 | 返回 422 `review_gate`，保留原状态、版本与审计，响应携带可读原因 |
+
+复核判定只依赖实时重读结果：`GET /api/decisions/:id/review-check` 返回按关联装置重读的装置、生效规则、最新已核验样本、阈值/读数、`blocked`、`overThreshold`、`reasons` 与 `allowedTargets`，页面据此显隐操作按钮并在保留原状态时展示原因；真正的迁移接口在服务端再次执行同一门禁，预览不参与写操作。
 
 ## 技术栈
 

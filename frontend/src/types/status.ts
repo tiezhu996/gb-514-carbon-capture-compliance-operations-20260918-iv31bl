@@ -11,3 +11,17 @@ export const ENTITY_CONFIGS: readonly EntityConfig[] = [
   { key: 'emissionSample', path: 'samples', label: '排放样本', statuses: ['collected', 'testing', 'verified', 'invalid'] as const },
   { key: 'complianceDecision', path: 'decisions', label: '合规决定', statuses: ['draft', 'review', 'accepted', 'escalated'] as const }
 ];
+
+// Mirrors backend constants.ComplianceDecisionTransitions. The review closed
+// loop gates the forward moves (draft->review, review->accepted/escalated);
+// these retract edges are retained for reachability checks only.
+export const DECISION_TRANSITIONS: Record<string, string[]> = {
+  draft: ['review'],
+  review: ['accepted', 'escalated', 'draft'],
+  accepted: ['escalated', 'review'],
+  escalated: ['accepted'],
+};
+
+export function decisionCanTransition(from: string, to: string): boolean {
+  return DECISION_TRANSITIONS[from]?.includes(to) ?? false;
+}

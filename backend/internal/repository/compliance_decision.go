@@ -14,6 +14,12 @@ type ComplianceDecisionRepository interface {
 	Get(context.Context, uint) (model.ComplianceDecision, error)
 	CreateWithRevision(context.Context, *model.ComplianceDecision, *model.DecisionRevision) error
 	UpdateWithRevision(context.Context, uint, uint, *model.ComplianceDecision, *model.DecisionRevision) error
+	// TransitionWithRevisionAndAudit commits the optimistic-locked status update,
+	// the appended immutable revision and the audit row in one transaction.
+	// Concurrent or duplicate submissions that no longer match expectedVersion
+	// affect zero rows and produce no revision and no audit entry, so a failed
+	// commit can never overwrite existing evidence or audit history.
+	TransitionWithRevisionAndAudit(context.Context, uint, uint, *model.ComplianceDecision, *model.DecisionRevision, *model.AuditLog) error
 	Delete(context.Context, uint) error
 	CountByStatus(context.Context) (map[string]int64, error)
 }
@@ -78,6 +84,27 @@ func (r *complianceDecisionRepository) UpdateWithRevision(ctx context.Context, i
 		}
 		revision.ComplianceDecisionID = id
 		return tx.Create(revision).Error
+	})
+}
+func (r *complianceDecisionRepository) TransitionWithRevisionAndAudit(ctx context.Context, id, version uint, item *model.ComplianceDecision, revision *model.DecisionRevision, audit *model.AuditLog) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Row-level optimistic lock: the WHERE on version serializes concurrent
+		// and duplicate submissions. When the version was already advanced by a
+		// prior request, RowsAffected is 0 and the whole transaction rolls back,
+		// leaving every earlier revision and audit record untouched.
+		result := tx.Model(&model.ComplianceDecision{}).Where("id = ? AND version = ?", id, version).
+			Select("*").Omit("id", "code", "created_at", "deleted_at", "Revisions").Updates(item)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrVersionConflict
+		}
+		revision.ComplianceDecisionID = id
+		if err := tx.Create(revision).Error; err != nil {
+			return err
+		}
+		return tx.Create(audit).Error
 	})
 }
 func (r *complianceDecisionRepository) Delete(ctx context.Context, id uint) error {

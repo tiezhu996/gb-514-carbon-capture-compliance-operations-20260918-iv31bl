@@ -169,9 +169,9 @@ func seedPermitRule(ctx context.Context, db *gorm.DB) error {
 			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
 			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-02"},
 
-		{BaseModel: model.BaseModel{Code: "PR-003", Name: "许可规则示例三", Status: "superseded", Version: 1,
+		{BaseModel: model.BaseModel{Code: "PR-003", Name: "许可规则示例三", Status: "active", Version: 1,
 			Description: "用于启动验证和主要流程演示的许可规则记录"}, Facility: "碳捕集装置合规运行区域3", Owner: "安全主管组",
-			Category: "复核", RiskLevel: "high", MetricValue: 37.5, MetricUnit: "score",
+			Category: "复核", RiskLevel: "high", MetricValue: 40.0, MetricUnit: "score",
 			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-03"},
 	}
 	return db.WithContext(ctx).Create(&items).Error
@@ -190,7 +190,7 @@ func seedEmissionSample(ctx context.Context, db *gorm.DB) error {
 			Category: "常规", RiskLevel: "low", MetricValue: 12.5, MetricUnit: "unit",
 			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-01"},
 
-		{BaseModel: model.BaseModel{Code: "ES-002", Name: "排放样本示例二", Status: "testing", Version: 1,
+		{BaseModel: model.BaseModel{Code: "ES-002", Name: "排放样本示例二", Status: "verified", Version: 1,
 			Description: "用于启动验证和主要流程演示的排放样本记录"}, Facility: "碳捕集装置合规运行区域2", Owner: "质量复核组",
 			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
 			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-514-02"},

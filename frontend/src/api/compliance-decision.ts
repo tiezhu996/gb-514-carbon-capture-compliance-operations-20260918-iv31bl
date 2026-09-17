@@ -1,6 +1,6 @@
 
 import { request } from './client';
-import type { DomainRecord } from '../types/domain';
+import type { DomainRecord, ReviewCheck } from '../types/domain';
 
 export async function listComplianceDecision(page = 1, pageSize = 20, search = '') {
   return request<DomainRecord[]>(`/decisions?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`);
@@ -12,4 +12,9 @@ export async function transitionComplianceDecision(id: number, status: string, e
   return request<DomainRecord>(`/decisions/${id}/transition`, {
     method: 'POST', body: JSON.stringify({ status, expectedVersion, reason }),
   });
+}
+// fetchReviewCheck re-reads the linked device, current effective permit rule
+// and latest verified sample without changing the decision.
+export async function fetchReviewCheck(id: number) {
+  return request<ReviewCheck>(`/decisions/${id}/review-check`);
 }

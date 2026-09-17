@@ -22,6 +22,7 @@ func (h *ComplianceDecisionHandler) Register(group *gin.RouterGroup) {
 	resource := group.Group("/decisions")
 	resource.GET("", h.list)
 	resource.GET("/:id", h.get)
+	resource.GET("/:id/review-check", h.reviewCheck)
 	resource.POST("", middleware.RequireMinimumRole("operator"), h.create)
 	resource.PUT("/:id", middleware.RequireMinimumRole("operator"), h.update)
 	resource.POST("/:id/transition", middleware.RequireMinimumRole("operator"), h.transition)
@@ -49,6 +50,19 @@ func (h *ComplianceDecisionHandler) get(c *gin.Context) {
 		return
 	}
 	util.OK(c, item)
+}
+
+func (h *ComplianceDecisionHandler) reviewCheck(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	check, err := h.service.ReviewCheck(c.Request.Context(), id)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	util.OK(c, check)
 }
 
 func (h *ComplianceDecisionHandler) create(c *gin.Context) {
